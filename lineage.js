@@ -2,8 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import CytoscapeComponent from 'react-cytoscapejs';
 import dagre from 'cytoscape-dagre';
 import cytoscape from 'cytoscape';
-import { useDispatch, useSelector } from "react-redux";
-import { selectEditor, setDagLevel } from "./editorSlice";
+import { useDispatch } from "react-redux";
+import { setDagLevel } from "./editorSlice";
 import { Loading } from "../widget/Loading";
 import { LoadError } from "../widget/LoadError";
 import { SpeedDial, SpeedDialIcon, ToggleButton, ToggleButtonGroup } from "@material-ui/lab";
@@ -62,8 +62,8 @@ interface EditorState {
 export const DAG: React.FC<Props> = (props) => {
   const classes = useStyles();
   const dispatch = useDispatch();
-  const editorState = useSelector(selectEditor) as EditorState;
   const [open, setOpen] = useState(false);
+  const [editorState, setEditorState] = useState<EditorState | null>(null);
   const cyRef = useRef<any>(null);
 
   const layoutTable = {
@@ -79,11 +79,25 @@ export const DAG: React.FC<Props> = (props) => {
     nodeSep: 15,
   };
 
+  const fetchEditorState = async () => {
+    try {
+      const response = await fetch('/api/editorState'); // Substitua pela URL da sua API
+      const data = await response.json();
+      setEditorState(data);
+    } catch (error) {
+      console.error('Erro ao buscar dados da API:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchEditorState();
+  }, []);
+
   const handleSave = () => {
     if (cyRef.current) {
       let cy = cyRef.current._cy;
       let aDownloadLink = document.createElement('a');
-      aDownloadLink.download = `${editorState.file}.jpg`;
+      aDownloadLink.download = `${editorState?.file}.jpg`;
       aDownloadLink.href = cy.jpg({ 'full': true, 'quality': 1 });
       aDownloadLink.click();
       setOpen(false);
@@ -93,7 +107,7 @@ export const DAG: React.FC<Props> = (props) => {
   const handleLevel = (event: React.MouseEvent<HTMLElement>, value: string) => {
     if (cyRef.current) {
       let cy = cyRef.current._cy;
-      let data = value === "column" ? editorState.dagColumn : editorState.dagContent;
+      let data = value === "column" ? editorState?.dagColumn : editorState?.dagContent;
       let layout = value === "column" ? layoutColumn : layoutTable;
       cy.elements().remove();
       cy.add(data);
@@ -190,7 +204,7 @@ export const DAG: React.FC<Props> = (props) => {
     }
   });
 
-  if (editorState.dagStatus === "loading") {
+  if (!editorState) {
     return <Loading minHeight={props.height} />;
   } else if (editorState.dagStatus === "failed") {
     return <LoadError minHeight={props.height}
